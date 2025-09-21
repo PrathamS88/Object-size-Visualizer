@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Scale Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for the loader */
+        .loader {
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #a78bfa; /* Violet color for loader */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800 bg-gray-100">
+
+    <header class="bg-white border-b border-gray-200">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center py-4">
+            <div>
+                <a href="#" class="text-3xl font-bold text-[#9F2089]">meesho</a>
+            </div>
+            <div class="flex items-center space-x-8 text-sm font-medium text-gray-700">
+                <a href="#" class="hover:text-gray-900">Dashboard</a>
+                <a href="#" class="hover:text-gray-900">Listings</a>
+                <a href="#" class="hover:text-gray-900">Help Center</a>
+            </div>
+        </nav>
+    </header>
+    <div class="container mx-auto px-4 py-8 md:py-12 max-w-5xl">
+
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Product Scale Visualizer</h1>
+
+        <main class="bg-white p-6 md:p-8 rounded-2xl shadow-lg">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                <div class="flex flex-col space-y-6">
+                    <div class="relative h-40 flex flex-col items-center justify-center border-2 border-dashed border-violet-400 rounded-lg p-6 text-center cursor-pointer bg-violet-50 hover:bg-violet-100 transition-colors">
+                        <label for="productImage" class="text-violet-700 font-semibold cursor-pointer">Upload Product Media</label>
+                        <p class="text-sm text-gray-500 mt-1">Click or drag & drop to get a visualization</p>
+                        <input type="file" id="productImage" name="productImage" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                    </div>
+
+                    <div id="originalPreviewContainer" class="flex-grow bg-gray-100 rounded-lg flex items-center justify-center min-h-[300px] aspect-square">
+                        <p class="text-gray-500 px-4">Your product media will appear here</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-col space-y-6">
+                    <h2 class="text-xl font-bold text-gray-800">Product Details & Dimensions</h2>
+
+                    <div>
+                        <label for="productDescription" class="block text-sm font-medium text-gray-700 mb-2"></label>
+                        <textarea id="productDescription" name="productDescription" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-violet-500 focus:border-violet-500" placeholder="e.g., A small, red ceramic mug, 4 inches tall and 3 inches in diameter."></textarea>
+                         <p class="text-xs text-gray-500 mt-1">Be as descriptive as possible for the best results.</p>
+                    </div>
+
+                    <div id="resultContainer" class="flex-grow bg-gray-100 rounded-lg flex items-center justify-center min-h-[250px] aspect-square overflow-hidden">
+                        <div id="loader" class="loader hidden"></div>
+                        <p id="resultPlaceholder" class="text-gray-500 px-4">Your AI visualization will be generated here...</p>
+                        <img id="resultImage" src="" alt="Generated product image with hand for scale" class="hidden w-full h-full object-contain">
+                    </div>
+
+                    
+
+                    <button id="generateButton" class="w-full bg-violet-200 text-violet-900 font-bold py-3 px-4 rounded-lg hover:bg-violet-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 transition-colors duration-200 shadow-sm">
+                        Visualize
+                    </button>
+                </div>
+
+            </div>
+
+            <div id="errorContainer" class="hidden mt-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+                <p><span class="font-semibold">Error:</span> <span id="errorMessage"></span></p>
+            </div>
+        </main>
+        
+    </div>
+
+    <script>
+        // --- IMPORTANT ---
+        // PASTE YOUR CLIPDROP API KEY HERE
+        const API_KEY = '3c7fcc32e5393eb7ede6ef3563fd1282e0e024f637cf5c3cd3abf6e9811ad7a7bff73f2720d8e186140a4f576cdc4087';
+
+        // DOM Element References
+        const imageInput = document.getElementById('productImage');
+        const descriptionInput = document.getElementById('productDescription');
+        const generateButton = document.getElementById('generateButton');
+        
+        const originalPreviewContainer = document.getElementById('originalPreviewContainer');
+        const resultContainer = document.getElementById('resultContainer');
+        const resultImage = document.getElementById('resultImage');
+        const resultPlaceholder = document.getElementById('resultPlaceholder');
+        const loader = document.getElementById('loader');
+        
+        const errorContainer = document.getElementById('errorContainer');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // ClipDrop API Endpoint
+        const API_ENDPOINT = 'https://clipdrop-api.co/replace-background/v1';
+
+        // --- Event Listeners ---
+
+        // 1. Show a preview of the selected image
+        imageInput.addEventListener('change', () => {
+            const file = imageInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    originalPreviewContainer.innerHTML = `<img src="${e.target.result}" alt="Original product preview" class="w-full h-full object-contain rounded-lg">`;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 2. Handle the "Visualize" button click
+        generateButton.addEventListener('click', async () => {
+            const imageFile = imageInput.files[0];
+            const description = descriptionInput.value.trim();
+
+            // --- Input Validation ---
+            if (API_KEY === 'YOUR_CLIPDROP_API_KEY_HERE') {
+                displayError('Please set your ClipDrop API key in the script section of the HTML file.');
+                return;
+            }
+            if (!imageFile) {
+                displayError('Please upload a product image.');
+                return;
+            }
+            if (!description) {
+                displayError('Please provide a product description and dimensions.');
+                return;
+            }
+
+            // --- UI Updates for Loading State ---
+            hideError();
+            showLoading(true);
+
+            // --- Prepare data for API call ---
+            const formData = new FormData();
+            formData.append('image_file', imageFile);
+            
+            // Construct a detailed prompt for the AI
+            const prompt = `Always must add a standard palm of human hand next to the product to clearly show its scale. The product is: ${description}. The background should be a neutral, clean, white studio setting.`;
+            formData.append('prompt', prompt);
+
+            // --- API Call ---
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'x-api-key': API_KEY,
+                    },
+                    body: formData,
+                });
+
+                // Check if the request was successful
+                if (response.ok) {
+                    const imageBlob = await response.blob();
+                    const imageUrl = URL.createObjectURL(imageBlob);
+                    resultImage.src = imageUrl;
+                    resultImage.classList.remove('hidden');
+                    resultPlaceholder.classList.add('hidden');
+                } else {
+                    // Handle API errors (e.g., bad API key, invalid input)
+                    const errorData = await response.json();
+                    displayError(errorData.error || 'An unknown API error occurred.');
+                }
+
+            } catch (error) {
+                // Handle network errors
+                console.error('Network or fetch error:', error);
+                displayError('A network error occurred. Please check your connection and try again.');
+            } finally {
+                // --- UI Updates after API call completes ---
+                showLoading(false);
+            }
+        });
+
+        // --- Helper Functions ---
+        function showLoading(isLoading) {
+            if (isLoading) {
+                loader.classList.remove('hidden');
+                resultPlaceholder.classList.remove('hidden');
+                resultImage.classList.add('hidden');
+                generateButton.disabled = true;
+                generateButton.textContent = 'Generating...';
+            } else {
+                loader.classList.add('hidden');
+                generateButton.disabled = false;
+                generateButton.textContent = 'Visualize';
+            }
+        }
+
+        function displayError(message) {
+            errorMessage.textContent = message;
+            errorContainer.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorContainer.classList.add('hidden');
+        }
+
+    </script>
+</body>
+</html>
